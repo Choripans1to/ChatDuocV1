@@ -197,3 +197,55 @@ except Exception as e:
 
 
 
+# backend/services.py (al final)
+
+def mis_inscripciones(rut_alumno: str):
+    """
+    Retorna la lista de secciones en las que el alumno está inscrito.
+    """
+    conn = get_connection(); cur = conn.cursor()
+    cur.execute("""
+        SELECT s.id_seccion, s.id_asignatura, s.profesor, s.horario, s.turno
+        FROM inscripciones i
+        JOIN secciones s ON i.id_seccion = s.id_seccion
+        WHERE i.rut_alumno = ?
+        ORDER BY s.id_asignatura, s.id_seccion;
+    """, (rut_alumno,))
+    out = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return out
+
+
+def cancelar_inscripcion(rut_alumno: str, id_seccion: str):
+    """
+    Elimina la inscripción del alumno en la sección y devuelve el cupo.
+    """
+    conn = get_connection(); cur = conn.cursor()
+
+    # Verifica que exista la inscripción
+    cur.execute(
+        "SELECT 1 FROM inscripciones WHERE rut_alumno=? AND id_seccion=?;",
+        (rut_alumno, id_seccion),
+    )
+    if not cur.fetchone():
+        conn.close()
+        return {"ok": False, "error": "No estás inscrito en esa sección"}
+
+    try:
+        # Borra inscripción y devuelve cupo (operación atómica)
+        cur.execute(
+            "DELETE FROM inscripciones WHERE rut_alumno=? AND id_seccion=?;",
+            (rut_alumno, id_seccion),
+        )
+        cur.execute(
+            "UPDATE secciones SET cupos_restantes = cupos_restantes + 1 WHERE id_seccion=?;",
+            (id_seccion,),
+        )
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return {"ok": False, "error": str(e)}
+    finally:
+        conn.close()
+
