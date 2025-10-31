@@ -19,11 +19,15 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 import os
+from pathlib import Path
+
 
 # --- CONSTANTES ---
-PDF_PATH = "reglamento.pdf"
+BASE_DIR = Path(__file__).resolve().parent   # -> ChatDuocV1/
+PDF_PATH = BASE_DIR / "reglamento.pdf"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL = "llama-3.1-8b-instant"
+
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Chatbot Académico Duoc UC", page_icon="🤖", layout="wide")
@@ -39,13 +43,15 @@ if not GROQ_API_KEY:
 ensure_db()     # crea data/duoc_chatbot.db desde data/malla_duoc.sql si no existe
 init_tables()   # asegura la tabla 'inscripciones'
 
-# --- SECCIÓN DE FUNCIONES CACHEADAS ---
 @st.cache_data(show_spinner="Cargando y procesando el PDF...")
-def cargar_y_procesar_pdf(pdf_path):
-    loader = PyPDFLoader(pdf_path)
+def cargar_y_procesar_pdf(pdf_path: Path):
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"No se encontró el PDF en: {pdf_path}")
+    loader = PyPDFLoader(str(pdf_path))  # str() por compatibilidad
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
     docs = loader.load_and_split(text_splitter=text_splitter)
     return docs
+
 
 @st.cache_resource(show_spinner="Creando el índice de búsqueda (Retriever)...")
 def crear_retriever(_docs):
@@ -194,5 +200,6 @@ try:
 except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
     st.exception(e)  # Muestra el traceback completo en Streamlit
+
 
 
