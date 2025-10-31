@@ -12,9 +12,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.retrievers import BM25Retriever
-# --- Importación Estándar para EnsembleRetriever (para versión 0.1.x) ---
 from langchain.retrievers import EnsembleRetriever
-# --- Fin ---
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
@@ -36,7 +34,10 @@ if not GROQ_API_KEY:
     st.error("La clave de API de Groq no está configurada. Por favor, agrégala a los Secrets de Streamlit.")
     st.stop() # Detiene la ejecución si no hay API key
 
-init_tables()    
+from backend.db import ensure_db, init_tables
+
+ensure_db()     # crea data/duoc_chatbot.db desde el .sql si no existe
+init_tables()   # asegura la tabla inscripciones  
 # --- SECCIÓN DE FUNCIONES CACHEADAS ---
 
 @st.cache_data(show_spinner="Cargando y procesando el PDF...")
@@ -154,3 +155,4 @@ except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
 
     st.exception(e) # Muestra el traceback completo en Streamlit
+
