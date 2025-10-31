@@ -5,6 +5,8 @@ from backend.services import (
     get_asignaturas_por_periodo,
     get_secciones_de_asignatura,
     inscribir_en_seccion,
+    mis_inscripciones,        
+    cancelar_inscripcion, 
 )
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
@@ -114,54 +116,88 @@ try:
             st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
 
     # ====== TAB 2: Inscripción ======
-    with tab_ins:
-        st.subheader("Inscripción (demo funcional)")
+with tab_ins:
+    st.subheader("Inscripción (demo funcional)")
 
-        # Identidad simple (en prod: autenticar)
-        rut_demo = st.text_input("RUT alumno (demo)", value="12345678-9")
+    # Identidad simple (en prod: autenticar)
+    rut_demo = st.text_input("RUT alumno (demo)", value="12345678-9")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            periodo_sel = st.number_input("Periodo", min_value=1, max_value=8, value=3, step=1)
-            asigs = get_asignaturas_por_periodo(int(periodo_sel))
-            opciones = [f"{a['nombre']} ({a['id_asignatura']})" for a in asigs] or ["(Sin ramos en este periodo)"]
-            asignatura_opt = st.selectbox("Asignatura", opciones)
-            id_asig_sel = asignatura_opt.split("(")[-1].rstrip(")") if "(" in asignatura_opt else None
+    col1, col2 = st.columns(2)
+    with col1:
+        periodo_sel = st.number_input("Periodo", min_value=1, max_value=8, value=3, step=1)
+        asigs = get_asignaturas_por_periodo(int(periodo_sel))
+        opciones = [f"{a['nombre']} ({a['id_asignatura']})" for a in asigs] or ["(Sin ramos en este periodo)"]
+        asignatura_opt = st.selectbox("Asignatura", opciones)
+        id_asig_sel = asignatura_opt.split("(")[-1].rstrip(")") if "(" in asignatura_opt else None
 
-        with col2:
-            turno_sel = st.selectbox("Turno", ["Todos", "Diurno", "Vespertino"])
+    with col2:
+        turno_sel = st.selectbox("Turno", ["Todos", "Diurno", "Vespertino"])
 
-        if id_asig_sel:
-            secciones = get_secciones_de_asignatura(
-                id_asig_sel,
-                None if turno_sel == "Todos" else turno_sel
-            )
-            st.write(f"Secciones de **{id_asig_sel}** ({'todas' if turno_sel=='Todos' else turno_sel}):")
+    if id_asig_sel:
+        secciones = get_secciones_de_asignatura(
+            id_asig_sel,
+            None if turno_sel == "Todos" else turno_sel
+        )
+        st.write(f"Secciones de **{id_asig_sel}** ({'todas' if turno_sel=='Todos' else turno_sel}):")
 
-            if not secciones:
-                st.info("No hay secciones con ese filtro.")
+        if not secciones:
+            st.info("No hay secciones con ese filtro.")
+        else:
+            etiquetas = [
+                f"{s['id_seccion']} | {s['profesor']} | {s['horario']} | cupos: {s['cupos_restantes']} | {s['turno']}"
+                for s in secciones
+            ]
+            idx = st.selectbox("Elige una sección", list(range(len(etiquetas))), format_func=lambda i: etiquetas[i])
+            sec_sel = secciones[idx]
+
+            aprobados = st.text_input("Ramos aprobados (códigos separados por coma)", value="")
+            aprobados_list = [x.strip() for x in aprobados.split(",")] if aprobados.strip() else []
+
+            if st.button("Inscribirme en esta sección"):
+                res = inscribir_en_seccion(
+                    rut_alumno=rut_demo,
+                    id_seccion=sec_sel["id_seccion"],
+                    ramos_aprobados=aprobados_list
+                )
+                if res.get("ok"):
+                    st.success(f"✅ {res['msg']} → {sec_sel['id_seccion']} ({sec_sel['horario']}) con {sec_sel['profesor']}")
+                    st.rerun()   # refresca cupos y listado
+                else:
+                    st.error(f"❌ {res.get('error','No se pudo inscribir')}")
+
+    # --- Mis inscripciones (listar y cancelar) ---
+    st.divider()
+    st.markdown("### Mis inscripciones")
+    ins = mis_inscripciones(rut_demo)
+
+    if not ins:
+        st.info("Aún no tienes inscripciones.")
+    else:
+        # Tabla simple
+        st.dataframe(
+            [{"Sección": i["id_seccion"], "Ramo": i["id_asignatura"], "Profesor": i["profesor"], "Horario": i["horario"], "Turno": i["turno"]} for i in ins],
+            hide_index=True,
+            use_container_width=True,
+        )
+
+        # Cancelar una inscripción
+        opciones_cancel = [f"{i['id_seccion']} · {i['id_asignatura']} · {i['horario']}" for i in ins]
+        idx_cancel = st.selectbox(
+            "Selecciona una inscripción para cancelar",
+            list(range(len(opciones_cancel))),
+            format_func=lambda i: opciones_cancel[i]
+        )
+        sel_cancel = ins[idx_cancel]
+
+        if st.button("Cancelar inscripción seleccionada", type="secondary"):
+            res = cancelar_inscripcion(rut_demo, sel_cancel["id_seccion"])
+            if res.get("ok"):
+                st.success("🗑️ Inscripción cancelada y cupo devuelto.")
+                st.rerun()  # recarga la página para refrescar tabla/cupos
             else:
-                etiquetas = [
-                    f"{s['id_seccion']} | {s['profesor']} | {s['horario']} | cupos: {s['cupos_restantes']} | {s['turno']}"
-                    for s in secciones
-                ]
-                idx = st.selectbox("Elige una sección", list(range(len(etiquetas))), format_func=lambda i: etiquetas[i])
-                sec_sel = secciones[idx]
-
-                aprobados = st.text_input("Ramos aprobados (códigos separados por coma)", value="")
-                aprobados_list = [x.strip() for x in aprobados.split(",")] if aprobados.strip() else []
-
-                if st.button("Inscribirme en esta sección"):
-                    res = inscribir_en_seccion(
-                        rut_alumno=rut_demo,
-                        id_seccion=sec_sel["id_seccion"],
-                        ramos_aprobados=aprobados_list
-                    )
-                    if res.get("ok"):
-                        st.success(f"✅ {res['msg']} → {sec_sel['id_seccion']} ({sec_sel['horario']}) con {sec_sel['profesor']}")
-                    else:
-                        st.error(f"❌ {res.get('error','No se pudo inscribir')}")
+                st.error(f"❌ {res.get('error','No se pudo cancelar')}")
 
 except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
     st.exception(e)  # Muestra el traceback completo en Streamlit
+
