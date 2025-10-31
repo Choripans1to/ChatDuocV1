@@ -116,8 +116,8 @@ try:
             st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
 
     # ====== TAB 2: Inscripción ======
-with tab_ins:
-    st.subheader("Inscripción (demo funcional)")
+ with tab_ins:
+     st.subheader("Inscripción (demo funcional)")
 
     # Identidad simple (en prod: autenticar)
     rut_demo = st.text_input("RUT alumno (demo)", value="12345678-9")
@@ -200,4 +200,5 @@ with tab_ins:
 except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
     st.exception(e)  # Muestra el traceback completo en Streamlit
+
 
