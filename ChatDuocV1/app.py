@@ -1,5 +1,11 @@
 # Versión FINAL OPTIMIZADA - Usando caché granular
 import streamlit as st
+from backend.db import init_tables, ensure_db
+from backend.services import (
+    get_asignaturas_por_periodo,
+    get_secciones_de_asignatura,
+    inscribir_en_seccion
+)
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -26,11 +32,11 @@ st.title("🤖 Chatbot del Reglamento Académico")
 # --- CARGA DE LA API KEY DE GROQ ---
 # Se obtiene una sola vez y se pasa a las funciones que la necesiten.
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
-
 if not GROQ_API_KEY:
     st.error("La clave de API de Groq no está configurada. Por favor, agrégala a los Secrets de Streamlit.")
     st.stop() # Detiene la ejecución si no hay API key
 
+init_tables()    
 # --- SECCIÓN DE FUNCIONES CACHEADAS ---
 
 @st.cache_data(show_spinner="Cargando y procesando el PDF...")
@@ -146,4 +152,5 @@ try:
 
 except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
+
     st.exception(e) # Muestra el traceback completo en Streamlit
