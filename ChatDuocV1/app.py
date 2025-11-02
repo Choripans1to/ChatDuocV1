@@ -30,8 +30,8 @@ LLM_MODEL = "llama-3.1-8b-instant"
 
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="Chatbot Académico Duoc UC", page_icon="🤖", layout="wide")
-st.title("🤖 Chatbot del Reglamento Académico")
+st.set_page_config(page_title="ChatDuoc", page_icon="🤖", layout="wide")
+st.title("🤖 Chatbot Académico")
 
 # --- CARGA DE LA API KEY DE GROQ ---
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
@@ -200,6 +200,7 @@ try:
 except Exception as e:
     st.error(f"Ha ocurrido un error durante la ejecución: {e}")
     st.exception(e)  # Muestra el traceback completo en Streamlit
+
 
 
 
